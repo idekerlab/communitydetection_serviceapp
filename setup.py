@@ -5,20 +5,21 @@ import os
 import re
 from setuptools import setup
 
-
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-
 with open(os.path.join('communitydetection_serviceapp', '__init__.py')) as ver_file:
     for line in ver_file:
         if line.startswith('__version__'):
-            version=re.sub("'", "", line[line.index("'"):])
+            version = re.sub("'", "", line[line.index("'"):])
 
 requirements = [
+    'cellmaps_utils>=0.3.0',
+    'ndex2>=3.9.0,<4.0.0',
+    'cellmaps_generate_hierarchy>=0.2.0'
 ]
 
 test_requirements = [
@@ -36,7 +37,7 @@ setup(
         'communitydetection_serviceapp',
     ],
     package_dir={'communitydetection_serviceapp':
-                 'communitydetection_serviceapp'},
+                     'communitydetection_serviceapp'},
     include_package_data=True,
     install_requires=requirements,
     license="BSD license",
