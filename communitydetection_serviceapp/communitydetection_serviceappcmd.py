@@ -1,8 +1,13 @@
 #!/usr/bin/env python
-
+import os.path
 import sys
 import argparse
 import json
+
+from cellmaps_generate_hierarchy.maturehierarchy import HiDeFHierarchyRefiner
+from ndex2.cx2 import CX2Network
+import ndex2.constants as constants
+from cellmaps_generate_hierarchy.hierarchy import CDAPSHiDeFHierarchyGenerator
 
 
 def _parse_arguments(desc, args):
@@ -16,8 +21,53 @@ def _parse_arguments(desc, args):
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=help_fm)
     parser.add_argument('input',
-                        help='Input')
+                        help='Input. Network in CX2 format.')
+    parser.add_argument('--interactome_uuid', default=None,
+                        help='Network UUID.')
+    parser.add_argument('--tempdir', default='/tmp',
+                        help='Directory needed to hold files temporarily for processing')
+    parser.add_argument('--k', default=10,
+                        help='HiDeF stability parameter')
+    parser.add_argument('--algorithm', default='leiden',
+                        help='HiDeF clustering algorithm parameter')
+    parser.add_argument('--maxres', default=80,
+                        help='HiDeF max resolution parameter')
+    parser.add_argument('--containment_threshold', default=0.75,
+                        help='Containment index threshold for pruning hierarchy')
+    parser.add_argument('--jaccard_threshold', default=0.9,
+                        help='Jaccard index threshold for merging similar clusters')
+    parser.add_argument('--min_diff', default=1,
+                        help='Minimum difference in number of proteins for every '
+                             'parent-child pair')
+    parser.add_argument('--min_system_size', default=4,
+                        help='Minimum number of proteins each system must have to be kept')
     return parser.parse_args(args)
+
+
+def get_edgelist_file(network, outdir):
+    dest_path = os.path.join(outdir, "edgelist.tsv")
+    with open(dest_path, 'w') as f:
+        for edge_id, edge_obj in network.get_edges().items():
+            s, t = edge_obj['s'], edge_obj['t']
+            f.write(str(s) + '\t' + str(t) + '\n')
+    return dest_path
+
+
+def run_community_detection(outdir, parent_net_path, algorithm, maxres, k, containment_threshold,
+                            jaccard_threshold, min_system_size, min_diff):
+    parent_network = CX2Network()
+    parent_network.create_from_raw_cx2(parent_net_path)
+    edgelist_file = get_edgelist_file(parent_network, outdir)
+    refiner = HiDeFHierarchyRefiner(ci_thre=containment_threshold,
+                                    ji_thre=jaccard_threshold,
+                                    min_term_size=min_system_size,
+                                    min_diff=min_diff,
+                                    provenance_utils=None)
+
+    generator = CDAPSHiDeFHierarchyGenerator(refiner=refiner)
+    hierarchy, _ = generator.get_hierarchy_from_edgelists(outdir, [edgelist_file],
+                                                          parent_network, algorithm, maxres, k)
+    return [hierarchy.to_cx2()]
 
 
 def main(args):
@@ -34,7 +84,9 @@ def main(args):
 
     theargs = _parse_arguments(desc, args[1:])
     try:
-        theres = None
+        theres = run_community_detection(theargs.tempdir, theargs.input, theargs.algorithm, theargs.maxres,
+                                         theargs.k, theargs.containment_threshold, theargs.jaccard_threshold,
+                                         theargs.min_system_size, theargs.min_diff)
 
         if theres is None:
             sys.stderr.write('No results\n')
