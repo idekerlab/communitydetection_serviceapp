@@ -25,7 +25,7 @@ test_requirements = [
 ]
 
 setup(
-    name='testcywebserviceapp',
+    name='communitydetection_serviceapp',
     version=version,
     description="Maps genes to terms",
     long_description=readme + '\n\n' + history,
